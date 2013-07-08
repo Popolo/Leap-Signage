@@ -114,5 +114,4 @@ public class LeapListener extends Listener {
 			return false;
 		}
 	}
-
 }

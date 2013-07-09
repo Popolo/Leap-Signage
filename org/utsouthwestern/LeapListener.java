@@ -13,9 +13,10 @@ public class LeapListener extends Listener {
 	boolean canPinch;
 	int timer;
 	Vector prevPos;
+	float prevDist;
 	
 	final float SHAKE_BOUND = 12.0f;
-	final int TIMER_REQ = 60;
+	final int TIMER_REQ = 300;
 	
 	public void onInit(Controller leap){
 		try {
@@ -40,12 +41,19 @@ public class LeapListener extends Listener {
     	if(pointer.isValid()){
     		Vector v = mouseSet(pointer);
     		readGestures(cFrame.gestures(),pointer);
+    		
+    		//Click if the user has hovered long enough.
     		if(pointClick(v)){
-    			
+    			mouse.mouseMove((int) prevPos.getX(), (int) prevPos.getY());
+    			mouse.mousePress(InputEvent.BUTTON1_MASK);
+				mouse.mouseRelease(InputEvent.BUTTON1_MASK);
     		}
-    		//funge(cFrame.pointables());
+    		if(cFrame.pointables().count() == 1 && pinchability(prevDist, cFrame.pointables())){
+    			setPinch(cFrame);
+    		}
     	}
 	}
+	
 	
 	private void readGestures(GestureList gestures, Pointable main){
 		for(int i=0;i<gestures.count();i++){
@@ -80,24 +88,25 @@ public class LeapListener extends Listener {
 		Vector v = screen.intersect(pointer, true);
 		int x = (int) (v.getX() * screen.widthPixels());
 		int y = 1080 - (int) (v.getY() * screen.heightPixels());
-		mouse.mouseMove(x, y);
+	//	mouse.mouseMove(x, y);
 		Vector i = new Vector(x,y,0);
 		return i;
 	}
 	
-	private void funge(PointableList purnt){
-		if(purnt.count()>1 && !buttonUp){
+	private void pinchTest(PointableList pointables){
+		if(pointables.count()>1 && !buttonUp){
 			mouse.mousePress(InputEvent.BUTTON1_MASK);
 			buttonUp = true;
-		}else if(purnt.count()<=1 && buttonUp){
+		}else if(pointables.count()<=1 && buttonUp){
 			mouse.mouseRelease(InputEvent.BUTTON1_MASK);
 			buttonUp = false;
 		}
 	}
 	
-	private boolean pinchability(float distPrev){
-		
-		return false;
+	private boolean pinchability(float distPrev, PointableList pointables){
+		float distCurrent = screen.intersect(pointables.get(0), true).distanceTo(screen.intersect(pointables.get(1), true));
+		prevDist = distCurrent;
+		return (distCurrent < distPrev);
 	}
 	
 	private boolean pointClick(Vector current){
@@ -108,10 +117,19 @@ public class LeapListener extends Listener {
 		}else{
 			prevPos = current.plus(prevPos).divide(2);
 			timer++;
+			if(timer % 50 == 0){
+				System.out.println("Wait " + (6 - timer / 50));
+			}
 			if(timer > TIMER_REQ){
 				return true;
 			}
 			return false;
+		}
+	}
+	
+	public void setPinch(Frame f){
+		if(!(f.pointables().count() == 1)){
+			canPinch = false;
 		}
 	}
 }

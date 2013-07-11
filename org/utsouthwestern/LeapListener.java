@@ -16,13 +16,13 @@ public class LeapListener extends Listener {
 	
 	final float SHAKE_BOUND = 12.0f;
 	final int TIMER_REQ = 300;
-	final float PINCH_BOUND = 5.0f;
+	final float PINCH_BOUND = 50.0f;
 	
 	public void onInit(Controller leap){
+		leap.setPolicyFlags(Controller.PolicyFlag.POLICY_BACKGROUND_FRAMES);
 		try {
 			mouse = new Robot();
 			screen = leap.locatedScreens().get(0);
-			leap.enableGesture(Gesture.Type.TYPE_SWIPE);
 		    buttonUp = true;
 		    prevPos = new Vector(0,0,0);
 		} catch (AWTException e) {
@@ -36,39 +36,12 @@ public class LeapListener extends Listener {
     	
     	//Instructions dependent on presence of pointables
     	if(pointer.isValid()){
-    		Vector v = mouseFind(pointer);
-    		readGestures(cFrame.gestures(),pointer);
-    		
+    		//Vector v = mouseFind(pointer);
     		//Click if the user has hovered long enough.
-    		pointClick2(pointClick(v));
+    		//pointClick2(pointClick(v));
     		
     		pinch(cFrame);
     	}
-	}
-	
-	
-	private void readGestures(GestureList gestures, Pointable main){
-		for(int i=0;i<gestures.count();i++){
-			Gesture current = gestures.get(i);
-			switch(current.type()){
-			case TYPE_SWIPE:
-				if(buttonUp){
-					mouse.mousePress(InputEvent.BUTTON1_MASK);
-					buttonUp = false;
-					System.out.println("swipe");
-				}
-				break;
-			default:
-				if(!buttonUp){
-					mouse.mouseRelease(InputEvent.BUTTON1_MASK);
-				}
-				break;
-			}
-		}
-		if(gestures.count() == 0 && !buttonUp){
-			mouse.mouseRelease(InputEvent.BUTTON1_MASK);
-			buttonUp = true;
-		}
 	}
 	
 	private Vector mouseFind(Pointable pointer){
@@ -82,27 +55,41 @@ public class LeapListener extends Listener {
 	void pinch(Frame frame){
 		PointableList pointables = frame.pointables();
 		Pointable pointer = pointables.frontmost();
+		
 		if (pointables.count() == 2){
 			Pointable other = null;
+			float dist = 900.0f;
 			for (int i = 0; i < pointables.count(); i++){
-				if(pointables.get(i) != pointer){
+				if(!pointables.get(i).equals(pointer) && pointables.count() > 1){
 					other = pointables.get(i);
+					dist = pointer.stabilizedTipPosition().distanceTo(other.stabilizedTipPosition());
 					break;
 				}
 			}
-			if(pointer.stabilizedTipPosition().distanceTo(other.stabilizedTipPosition()) < PINCH_BOUND){
+			if( dist < PINCH_BOUND){
 				canPinch = true;
+				System.out.println("it's ture!" + dist);
 			}else{
 				canPinch = false;
 			}
-		}else if(pointables.count() == 1){
-			if(canPinch){
-				mouse.mousePress(InputEvent.BUTTON1_MASK);
-			}else{
+			if(!buttonUp){
 				mouse.mouseRelease(InputEvent.BUTTON1_MASK);
+				System.out.print("not olives...");
+				buttonUp = true;
+			}
+		}else if(pointables.count() == 1 && canPinch){
+			if(buttonUp){
+				buttonUp = false;
+				mouse.mousePress(InputEvent.BUTTON1_MASK);
+				System.out.print(" Olives.");
 			}
 		}else{
-			canPinch = false;
+			if(!buttonUp){
+				mouse.mouseRelease(InputEvent.BUTTON1_MASK);
+				System.out.print("not olives...");
+				buttonUp = true;
+				canPinch = false;
+			}
 		}
 	}
 	
@@ -134,5 +121,9 @@ public class LeapListener extends Listener {
 			mouse.mouseRelease(InputEvent.BUTTON1_MASK);
 			timer = 0;
 		}
+	}
+	
+	public void grab(){
+		
 	}
 }

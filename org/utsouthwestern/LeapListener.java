@@ -86,36 +86,6 @@ public class LeapListener extends Listener {
 		}
 	}
 	
-	
-	
-	// the hoverClicking methods.
-//	private boolean pointClick(Vector current){
-//		if(current.distanceTo(prevPos) > SHAKE_BOUND){
-//			timer = 0;
-//			prevPos = current;
-//			return false;
-//		}else{
-//			prevPos = current.plus(prevPos).divide(2);
-//			timer++;
-//			if(timer % 50 == 0){
-//				System.out.println("Wait " + (6 - timer / 50));
-//			}
-//			if(timer > TIMER_REQ){
-//				return true;
-//			}
-//			return false;
-//		}
-//	}
-//	
-//	private void pointClick2(boolean yay){
-//		if (yay){
-//			mouse.mouseMove((int) prevPos.getX(), (int) prevPos.getY());
-//			mouse.mousePress(InputEvent.BUTTON1_MASK);
-//			mouse.mouseRelease(InputEvent.BUTTON1_MASK);
-//			timer = 0;
-//		}
-//	}
-	
 	public void grab(Frame frame){
 		PointableList pointables = frame.pointables();
 		if(timer>0){timer -= 1;}

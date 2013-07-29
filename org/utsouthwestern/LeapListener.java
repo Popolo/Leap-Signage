@@ -1,5 +1,7 @@
 package org.utsouthwestern;
 import java.awt.AWTException;
+import java.awt.MouseInfo;
+import java.awt.Point;
 import java.awt.Robot;
 import java.awt.event.InputEvent;
 
@@ -7,20 +9,20 @@ import com.leapmotion.leap.*;
 
 public class LeapListener extends Listener {
 	Robot mouse;
+	Point pos;
 	Screen screen;
-	boolean buttonUp; //testing only, currently.
+	boolean buttonUp; 
 	boolean canPinch;
+	boolean canUnpinch;
 	boolean canGrab;
 	boolean grabbing;
 	int timer;
-	Vector current;
-	Vector currentPos;
 	float prevDist;
 	
-	//final float SHAKE_BOUND = 12.0f;
 	final int TIMER_REQ = 300;
 	final float PINCH_BOUND = 50.0f;
-	final float CONVERSION = 30.0f;
+	final float CONVERSION = 0.051f;
+	final float LOW_SPEED = 5.0f;
 	
 	public void onInit(Controller leap){
 		leap.setPolicyFlags(Controller.PolicyFlag.POLICY_BACKGROUND_FRAMES);
@@ -28,23 +30,25 @@ public class LeapListener extends Listener {
 			mouse = new Robot();
 			screen = leap.locatedScreens().get(0);
 		    buttonUp = true;
-		    currentPos = new Vector(0,0,0);
 		} catch (AWTException e) {
-			//break
 		}
 	}
 	
 	public void onFrame(Controller leap){
 		Frame cFrame = leap.frame();
     	Pointable pointer = cFrame.pointables().frontmost();
+    	pos = MouseInfo.getPointerInfo().getLocation();
+    	HandList hands =  cFrame.hands();
     	
-    	//Instructions dependent on presence of pointables
-    	if(pointer.isValid()){
-    	//	pinch(cFrame);
+    	if(hands.count() > 0){
+    		if(pointer.isValid()){
+    	    	pinch(cFrame);
+    	    }
+    		grab(cFrame);
     	}
-    	grab(cFrame);
 	}
 	
+	//Exactly what it says. (Temperamental Method)
 	void pinch(Frame frame){
 		PointableList pointables = frame.pointables();
 		Pointable pointer = pointables.frontmost();
@@ -56,6 +60,12 @@ public class LeapListener extends Listener {
 				if(!pointables.get(i).equals(pointer) && pointables.count() > 1){
 					other = pointables.get(i);
 					dist = pointer.stabilizedTipPosition().distanceTo(other.stabilizedTipPosition());
+					if(pointer.tipVelocity().minus(other.tipVelocity()).magnitude() < LOW_SPEED){
+						mouse.mousePress(InputEvent.BUTTON2_MASK);
+						mouse.mouseRelease(InputEvent.BUTTON2_MASK);
+						mouse.mousePress(InputEvent.BUTTON2_MASK);
+						mouse.mouseRelease(InputEvent.BUTTON2_MASK);
+					}
 					break;
 				}
 			}
@@ -65,33 +75,26 @@ public class LeapListener extends Listener {
 			}else{
 				canPinch = false;
 			}
-			if(!buttonUp){
-				mouse.mouseRelease(InputEvent.BUTTON1_MASK);
-				System.out.print("not olives...");
-				buttonUp = true;
-			}
 		}else if(pointables.count() == 1 && canPinch){
-			if(buttonUp){
-				buttonUp = false;
 				mouse.mousePress(InputEvent.BUTTON1_MASK);
-				System.out.print(" Olives.");
-			}
-		}else{
-			if(!buttonUp){
 				mouse.mouseRelease(InputEvent.BUTTON1_MASK);
-				System.out.print("not olives...");
-				buttonUp = true;
+				mouse.mousePress(InputEvent.BUTTON1_MASK);
+				mouse.mouseRelease(InputEvent.BUTTON1_MASK);
 				canPinch = false;
-			}
+				canUnpinch = true;
+		}else{
+			canPinch = false;
+			canUnpinch = false;
 		}
 	}
 	
+	//Exactly what it says.
 	public void grab(Frame frame){
 		PointableList pointables = frame.pointables();
 		if(timer>0){timer -= 1;}
 		if(pointables.count() >= 4){
 			canGrab = true;
-			timer = 30;
+			timer = 80;
 		}else if (pointables.count() == 0 && timer > 0 && canGrab){
 			grabbing = true;
 			canGrab = false;
@@ -111,15 +114,41 @@ public class LeapListener extends Listener {
 		}
 		
 		if (grabbing){
-			accelerometer(currentPos,frame.hands().frontmost());
+			grabMove(ptv(pos),frame.hands().frontmost());
 		}
 	}
 	
-	public void accelerometer(Vector posCurrent, Hand pointer){
-		Vector n = posCurrent.plus(pointer.palmVelocity());
-		currentPos = n;
-		System.out.println(n);
-		mouse.mouseMove((int) n.getX(), (int) n.getY()); 
+	//Moves the pointer when grabbing.
+	public void grabMove(Vector posCurrent, Hand pointer){
+		Vector i = pointer.palmVelocity().times(CONVERSION);
+		i.setY(i.getY() * -1);
+		Vector n = posCurrent.plus(i);
+		n = limit(n);
+		mouse.mouseMove((int) n.getX(), (int) n.getY());
+		
+		System.out.println(pointer.palmVelocity());
+		System.out.print(n);
 	}
-
+	
+	//Converts points to vectors.
+	private Vector ptv (Point p){
+		return new Vector(p.x,p.y,0);
+	}
+	
+	//Limits the given vector to screen coordinates.
+	private Vector limit(Vector v){
+		if(v.getX() < 0){
+			v.setX(0);
+		}else if(v.getX() > screen.widthPixels()){
+			v.setX(screen.widthPixels());
+		}
+		
+		if(v.getY() < 0){
+			v.setY(0);
+		}else if(v.getY() > screen.heightPixels()){
+			v.setY(screen.heightPixels());
+		}
+		
+		return v;
+	}
 }

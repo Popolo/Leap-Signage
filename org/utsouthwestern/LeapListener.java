@@ -60,17 +60,20 @@ public class LeapListener extends Listener {
 				if(!pointables.get(i).equals(pointer) && pointables.count() > 1){
 					other = pointables.get(i);
 					dist = pointer.stabilizedTipPosition().distanceTo(other.stabilizedTipPosition());
-					if(pointer.tipVelocity().minus(other.tipVelocity()).magnitude() < LOW_SPEED){
+					if(dist > PINCH_BOUND && canUnpinch){
 						mouse.mousePress(InputEvent.BUTTON2_MASK);
 						mouse.mouseRelease(InputEvent.BUTTON2_MASK);
 						mouse.mousePress(InputEvent.BUTTON2_MASK);
 						mouse.mouseRelease(InputEvent.BUTTON2_MASK);
+						System.out.println("DEGEELO");
+						canUnpinch = false;
 					}
 					break;
 				}
 			}
 			if( dist < PINCH_BOUND){
 				canPinch = true;
+				canUnpinch = true;
 				System.out.println("it's ture!" + dist);
 			}else{
 				canPinch = false;
@@ -82,6 +85,7 @@ public class LeapListener extends Listener {
 				mouse.mouseRelease(InputEvent.BUTTON1_MASK);
 				canPinch = false;
 				canUnpinch = true;
+				System.out.println("DEGEELO~");
 		}else{
 			canPinch = false;
 			canUnpinch = false;

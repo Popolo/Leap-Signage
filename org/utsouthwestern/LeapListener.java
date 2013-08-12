@@ -17,6 +17,7 @@ public class LeapListener extends Listener {
 	boolean canGrab;
 	boolean grabbing;
 	int timer;
+	int prevenTimer;
 	float prevDist;
 	
 	final int TIMER_REQ = 300;
@@ -48,11 +49,11 @@ public class LeapListener extends Listener {
     	}
 	}
 	
-	//Exactly what it says. (Temperamental Method)
+	//Exactly what it says. 
 	void pinch(Frame frame){
 		PointableList pointables = frame.pointables();
 		Pointable pointer = pointables.frontmost();
-		
+		if(prevenTimer>0){prevenTimer-=1;}
 		if (pointables.count() == 2){
 			Pointable other = null;
 			float dist = 900.0f;
@@ -61,12 +62,10 @@ public class LeapListener extends Listener {
 					other = pointables.get(i);
 					dist = pointer.stabilizedTipPosition().distanceTo(other.stabilizedTipPosition());
 					if(dist > PINCH_BOUND && canUnpinch){
-						mouse.mousePress(InputEvent.BUTTON2_MASK);
-						mouse.mouseRelease(InputEvent.BUTTON2_MASK);
-						mouse.mousePress(InputEvent.BUTTON2_MASK);
-						mouse.mouseRelease(InputEvent.BUTTON2_MASK);
+						mouse.mouseWheel(-30);
 						System.out.println("DEGEELO");
 						canUnpinch = false;
+						prevenTimer = 30;
 					}
 					break;
 				}
@@ -79,10 +78,7 @@ public class LeapListener extends Listener {
 				canPinch = false;
 			}
 		}else if(pointables.count() == 1 && canPinch){
-				mouse.mousePress(InputEvent.BUTTON1_MASK);
-				mouse.mouseRelease(InputEvent.BUTTON1_MASK);
-				mouse.mousePress(InputEvent.BUTTON1_MASK);
-				mouse.mouseRelease(InputEvent.BUTTON1_MASK);
+				mouse.mouseWheel(30);
 				canPinch = false;
 				canUnpinch = true;
 				System.out.println("DEGEELO~");

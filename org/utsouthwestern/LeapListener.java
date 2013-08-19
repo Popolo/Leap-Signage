@@ -12,18 +12,17 @@ public class LeapListener extends Listener {
 	Robot mouse;
 	Screen screen;
 	boolean buttonUp;
-	boolean canPinch;
-	boolean canUnpinch;
 	boolean canGrab;
 	boolean grabbing;
 	int timer;
-	int prevenTimer;
 	float prevDist;
+	Point lockPosition;
+	int overload;
+	Frame pFrame;
+	boolean overloaded;
 
 	final int TIMER_REQ = 300;
-	final float PINCH_BOUND = 50.0f;
-	final float CONVERSION = 0.051f;
-	final float LOW_SPEED = 5.0f;
+	final float CONVERSION = 0.081f;
 
 	public void onInit(Controller leap) {
 		leap.setPolicyFlags(Controller.PolicyFlag.POLICY_BACKGROUND_FRAMES);
@@ -31,6 +30,8 @@ public class LeapListener extends Listener {
 			mouse = new Robot();
 			screen = leap.locatedScreens().get(0);
 			buttonUp = true;
+			lockPosition = null;
+			overload = 0;
 		} catch (AWTException e) {
 		}
 	}
@@ -39,74 +40,68 @@ public class LeapListener extends Listener {
 		Frame cFrame = leap.frame();
 		Pointable pointer = cFrame.pointables().frontmost();
 		HandList hands = cFrame.hands();
-
+		Point currentPos = MouseInfo.getPointerInfo().getLocation();
+		mouse.mouseMove(currentPos.x, currentPos.y);
+	
+		handZoom(cFrame);
 		if (hands.count() > 0) {
 			if (pointer.isValid()) {
-				// pinch(cFrame);
 			}
-			handZoom(cFrame);
 			grab(cFrame);
 		}
+		pFrame = cFrame;
 	}
 
-	// Exactly what it says.
-	void pinch(Frame frame) {
-		PointableList pointables = frame.pointables();
-		Pointable pointer = pointables.frontmost();
-		if (prevenTimer > 0) {
-			prevenTimer -= 1;
+	// Limits the given vector to screen coordinates.
+	private Vector limit(Vector v) {
+		if (v.getX() < 0) {
+			v.setX(0);
+		} else if (v.getX() > screen.widthPixels()) {
+			v.setX(screen.widthPixels());
 		}
-		if (pointables.count() == 2) {
-			Pointable other = null;
-			float dist = 900.0f;
-			for (int i = 0; i < pointables.count(); i++) {
-				if (!pointables.get(i).equals(pointer)
-						&& pointables.count() > 1) {
-					other = pointables.get(i);
-					dist = pointer.stabilizedTipPosition().distanceTo(
-							other.stabilizedTipPosition());
-					if (dist > PINCH_BOUND && canUnpinch) {
-						mouse.mouseWheel(-30);
-						System.out.println("DEGEELO");
-						canUnpinch = false;
-						prevenTimer = 30;
-					}
-					break;
-				}
-			}
-			if (dist < PINCH_BOUND) {
-				canPinch = true;
-				canUnpinch = true;
-				System.out.println("it's ture!" + dist);
-			} else {
-				canPinch = false;
-			}
-		} else if (pointables.count() == 1 && canPinch) {
-			mouse.mouseWheel(30);
-			canPinch = false;
-			canUnpinch = true;
-			System.out.println("DEGEELO~");
-		} else {
-			canPinch = false;
-			canUnpinch = false;
+	
+		if (v.getY() < 0) {
+			v.setY(0);
+		} else if (v.getY() > screen.heightPixels()) {
+			v.setY(screen.heightPixels());
 		}
+	
+		return v;
 	}
 
+	//Allows zooming using two hands
 	public void handZoom(Frame cFrame) {
-		if (cFrame.hands().count() == 2 && cFrame.pointables().count() == 0) {
+		if(overload > 50 || overloaded){
+			overload -= 5;
+			overloaded = (overload < 0);
+			return;
+		}
+		if(cFrame.hands().count() < 2 || cFrame.pointables().count() > 2){
+			lockPosition = null;
+			overload -= 5;
+		}else if (cFrame.hands().count() == 2 && cFrame.pointables().count() <= 2) {
+			if(lockPosition == null){
+				lockPosition = MouseInfo.getPointerInfo().getLocation();
+			}
 			HandList hands = cFrame.hands();
 			float dist = hands.get(0).palmPosition().distanceTo(hands.get(1).palmPosition());
 			float diff = dist - prevDist;
+			diff *= -1;
 			prevDist = dist;
-			if((diff > 2 && diff < 30) || (diff < -2 && diff > -30)){
-				mouse.mouseMove(screen.widthPixels()/2,screen.heightPixels()/2);
-				mouse.mouseWheel((int) diff);
+			if(dist > 10 && ((diff > 2 && diff < 30) || (diff < -2 && diff > -30))){
+				mouse.mouseMove(lockPosition.x,lockPosition.y);
+				mouse.mouseWheel((int) (diff * CONVERSION));
+				overload++;
 				System.out.println("Zoomed: " + diff);
+			}else{
+				overload -= 5;
 			}
 		} else {
 			prevDist = 0;
 		}
 	}
+	
+	
 
 	// Exactly what it says.
 	public void grab(Frame frame) {
@@ -115,6 +110,8 @@ public class LeapListener extends Listener {
 			if (timer > 0) {
 				timer -= 1;
 			}
+			
+			//Allow grabbing with enough fingers
 			if (pointables.count() >= 4) {
 				canGrab = true;
 				timer = 80;
@@ -122,7 +119,7 @@ public class LeapListener extends Listener {
 				grabbing = true;
 				canGrab = false;
 			}
-			if (pointables.count() > 0 && grabbing) {
+			if (pointables.count() > 1 && grabbing) {
 				grabbing = false;
 			}
 			if (timer == 0 && canGrab) {
@@ -144,6 +141,7 @@ public class LeapListener extends Listener {
 
 	// Moves the pointer when grabbing.
 	public void grabMove(Hand pointer) {
+		
 		Vector posCurrent = ptv(MouseInfo.getPointerInfo().getLocation());
 		Vector i = pointer.palmVelocity().times(CONVERSION);
 		i.setY(i.getY() * -1);
@@ -158,22 +156,5 @@ public class LeapListener extends Listener {
 	// Converts points to vectors.
 	private Vector ptv(Point p) {
 		return new Vector(p.x, p.y, 0);
-	}
-
-	// Limits the given vector to screen coordinates.
-	private Vector limit(Vector v) {
-		if (v.getX() < 0) {
-			v.setX(0);
-		} else if (v.getX() > screen.widthPixels()) {
-			v.setX(screen.widthPixels());
-		}
-
-		if (v.getY() < 0) {
-			v.setY(0);
-		} else if (v.getY() > screen.heightPixels()) {
-			v.setY(screen.heightPixels());
-		}
-
-		return v;
 	}
 }
